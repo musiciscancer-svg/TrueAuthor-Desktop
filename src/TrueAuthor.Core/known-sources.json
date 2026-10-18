@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "comment": "Shared by the TypeScript source-map package and the Windows desktop app. Patterns are case-insensitive regular expressions using syntax common to JavaScript and .NET.",
+  "domains": [
+    { "domain": "chatgpt.com", "category": "ai", "name": "ChatGPT" },
+    { "domain": "chat.openai.com", "category": "ai", "name": "ChatGPT" },
+    { "domain": "claude.ai", "category": "ai", "name": "Claude" },
+    { "domain": "gemini.google.com", "category": "ai", "name": "Gemini" },
+    { "domain": "aistudio.google.com", "category": "ai", "name": "Google AI Studio" },
+    { "domain": "copilot.microsoft.com", "category": "ai", "name": "Microsoft Copilot" },
+    { "domain": "m365.cloud.microsoft", "category": "ai", "name": "Microsoft 365 Copilot" },
+    { "domain": "perplexity.ai", "category": "ai", "name": "Perplexity" },
+    { "domain": "chat.deepseek.com", "category": "ai", "name": "DeepSeek" },
+    { "domain": "grok.com", "category": "ai", "name": "Grok" },
+    { "domain": "meta.ai", "category": "ai", "name": "Meta AI" },
+    { "domain": "chat.mistral.ai", "category": "ai", "name": "Le Chat" },
+    { "domain": "poe.com", "category": "ai", "name": "Poe" },
+    { "domain": "quillbot.com", "category": "ai", "name": "QuillBot" },
+    { "domain": "character.ai", "category": "ai", "name": "Character.AI" },
+
+    { "domain": "doi.org", "category": "academic", "name": "DOI" },
+    { "domain": "arxiv.org", "category": "academic", "name": "arXiv" },
+    { "domain": "scholar.google.com", "category": "academic", "name": "Google Scholar" },
+    { "domain": "jstor.org", "category": "academic", "name": "JSTOR" },
+    { "domain": "pubmed.ncbi.nlm.nih.gov", "category": "academic", "name": "PubMed" },
+    { "domain": "ncbi.nlm.nih.gov", "category": "academic", "name": "NCBI" },
+    { "domain": "sciencedirect.com", "category": "academic", "name": "ScienceDirect" },
+    { "domain": "link.springer.com", "category": "academic", "name": "Springer" },
+    { "domain": "nature.com", "category": "academic", "name": "Nature" },
+    { "domain": "science.org", "category": "academic", "name": "Science" },
+    { "domain": "onlinelibrary.wiley.com", "category": "academic", "name": "Wiley" },
+    { "domain": "tandfonline.com", "category": "academic", "name": "Taylor & Francis" },
+    { "domain": "researchgate.net", "category": "academic", "name": "ResearchGate" },
+    { "domain": "semanticscholar.org", "category": "academic", "name": "Semantic Scholar" },
+    { "domain": "ieeexplore.ieee.org", "category": "academic", "name": "IEEE Xplore" },
+    { "domain": "dl.acm.org", "category": "academic", "name": "ACM Digital Library" },
+    { "domain": "ssrn.com", "category": "academic", "name": "SSRN" },
+    { "domain": "plos.org", "category": "academic", "name": "PLOS" },
+    { "domain": "frontiersin.org", "category": "academic", "name": "Frontiers" },
+    { "domain": "mdpi.com", "category": "academic", "name": "MDPI" },
+    { "domain": "journals.sagepub.com", "category": "academic", "name": "SAGE" },
+    { "domain": "academic.oup.com", "category": "academic", "name": "Oxford Academic" },
+    { "domain": "cambridge.org", "category": "academic", "name": "Cambridge" },
+    { "domain": "biorxiv.org", "category": "academic", "name": "bioRxiv" },
+    { "domain": "openalex.org", "category": "academic", "name": "OpenAlex" },
+
+    { "domain": "wikipedia.org", "category": "reference", "name": "Wikipedia" },
+    { "domain": "britannica.com", "category": "reference", "name": "Britannica" },
+    { "domain": "merriam-webster.com", "category": "reference", "name": "Merriam-Webster" },
+    { "domain": "dictionary.com", "category": "reference", "name": "Dictionary.com" },
+    { "domain": "plato.stanford.edu", "category": "reference", "name": "Stanford Encyclopedia of Philosophy" },
+
+    { "domain": "docs.google.com", "category": "document", "name": "Google Docs" },
+    { "domain": "onedrive.live.com", "category": "document", "name": "OneDrive" },
+    { "domain": "notion.so", "category": "document", "name": "Notion" }
+  ],
+  "processes": [
+    { "process": "chatgpt.exe", "category": "ai", "name": "ChatGPT desktop" },
+    { "process": "claude.exe", "category": "ai", "name": "Claude desktop" },
+    { "process": "copilot.exe", "category": "ai", "name": "Microsoft Copilot" },
+    { "process": "winword.exe", "category": "document", "name": "Microsoft Word" },
+    { "process": "powerpnt.exe", "category": "document", "name": "Microsoft PowerPoint" },
+    { "process": "excel.exe", "category": "document", "name": "Microsoft Excel" },
+    { "process": "onenote.exe", "category": "document", "name": "OneNote" },
+    { "process": "notion.exe", "category": "document", "name": "Notion" },
+    { "process": "obsidian.exe", "category": "document", "name": "Obsidian" },
+    { "process": "notepad.exe", "category": "document", "name": "Notepad" },
+    { "process": "acrobat.exe", "category": "pdf", "name": "Adobe Acrobat" },
+    { "process": "acrord32.exe", "category": "pdf", "name": "Adobe Acrobat Reader" },
+    { "process": "sumatrapdf.exe", "category": "pdf", "name": "SumatraPDF" },
+    { "process": "foxitpdfreader.exe", "category": "pdf", "name": "Foxit PDF Reader" },
+    { "process": "zotero.exe", "category": "reference-manager", "name": "Zotero" },
+    { "process": "mendeley reference manager.exe", "category": "reference-manager", "name": "Mendeley" },
+    { "process": "code.exe", "category": "code", "name": "Visual Studio Code" },
+    { "process": "outlook.exe", "category": "communication", "name": "Outlook" },
+    { "process": "olk.exe", "category": "communication", "name": "Outlook" },
+    { "process": "ms-teams.exe", "category": "communication", "name": "Microsoft Teams" },
+    { "process": "slack.exe", "category": "communication", "name": "Slack" },
+    { "process": "discord.exe", "category": "communication", "name": "Discord" }
+  ],
+  "browsers": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe"],
+  "browserTitleSuffix": " (?:-|—|–) (?:Google Chrome|Microsoft\u200B? Edge|Mozilla Firefox|Brave|Opera|Vivaldi|Arc)$",
+  "browserTitleNoise": " and \\d+ more pages?(?=$| (?:-|—|–) )",
+  "windowTitles": [
+    { "pattern": "^ChatGPT$", "category": "ai", "name": "ChatGPT" },
+    { "pattern": " (?:-|\\|) ChatGPT$", "category": "ai", "name": "ChatGPT" },
+    { "pattern": "^Claude$", "category": "ai", "name": "Claude" },
+    { "pattern": " (?:-|\\|) Claude$", "category": "ai", "name": "Claude" },
+    { "pattern": "^(?:Google )?Gemini$", "category": "ai", "name": "Gemini" },
+    { "pattern": " (?:-|\\|) (?:Google )?Gemini$", "category": "ai", "name": "Gemini" },
+    { "pattern": "Microsoft Copilot", "category": "ai", "name": "Microsoft Copilot" },
+    { "pattern": "(?:^| (?:-|\\|) )Perplexity$", "category": "ai", "name": "Perplexity" },
+    { "pattern": "(?:^| (?:-|\\|) )DeepSeek$", "category": "ai", "name": "DeepSeek" },
+    { "pattern": " (?:-|\\|) Google Docs$", "category": "document", "name": "Google Docs" },
+    { "pattern": " (?:-|—|–) Wikipedia$", "category": "reference", "name": "Wikipedia" },
+    { "pattern": " (?:-|\\|) Google Scholar$", "category": "academic", "name": "Google Scholar" },
+    { "pattern": " (?:-|\\|) ScienceDirect$", "category": "academic", "name": "ScienceDirect" },
+    { "pattern": " (?:-|\\|) PubMed$", "category": "academic", "name": "PubMed" },
+    { "pattern": "\\.pdf$", "category": "pdf", "name": "PDF document" }
+  ],
+  "writingSurfaces": {
+    "processes": [
+      { "process": "winword.exe", "name": "Microsoft Word", "titleSuffix": " - (?:Word|Microsoft Word)$" }
+    ],
+    "browserTitles": [
+      { "pattern": " - Google Docs$", "name": "Google Docs" }
+    ]
+  },
+  "blocked": {
+    "domains": [
+      "1password.com", "bitwarden.com", "lastpass.com", "dashlane.com", "keepersecurity.com", "proton.me",
+      "accounts.google.com", "login.microsoftonline.com", "login.live.com", "account.microsoft.com", "appleid.apple.com",
+      "paypal.com", "venmo.com", "cash.app", "wise.com", "revolut.com", "stripe.com", "coinbase.com", "binance.com",
+      "chase.com", "bankofamerica.com", "wellsfargo.com", "citi.com", "capitalone.com", "americanexpress.com", "discover.com",
+      "usbank.com", "pnc.com", "schwab.com", "fidelity.com", "vanguard.com", "robinhood.com", "irs.gov", "ssa.gov"
+    ],
+    "hostPatterns": ["(?:^|[.-])(?:bank|banking|login|signin|auth|sso|password|vault)(?:[.-]|$)"],
+    "processes": [
+      "keepass.exe", "keepassxc.exe", "1password.exe", "bitwarden.exe", "lastpass.exe", "dashlane.exe",
+      "keeper.exe", "credentialuibroker.exe", "consent.exe", "mstsc.exe"
+    ],
+    "titlePatterns": ["password", "passcode", "\\b2fa\\b", "one-time code", "recovery (?:code|key)", "\\b(?:sign|log) ?in\\b", "online banking", "1Password", "Bitwarden", "LastPass", "KeePass"]
+  },
+  "clipboardExclusionFormats": ["ExcludeClipboardContentFromMonitorProcessing", "Clipboard Viewer Ignore"],
+  "clipboardHistoryOptOutFormats": ["CanIncludeInClipboardHistory", "CanUploadToCloudClipboard"]
+}
