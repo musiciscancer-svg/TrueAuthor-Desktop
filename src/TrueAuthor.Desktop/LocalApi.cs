@@ -58,6 +58,7 @@ sealed partial class LocalApi(ClipboardLedger ledger, ActivityLog log, Func<bool
         try { approved = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(ConnectionsPath)) ?? []; }
         catch { approved = []; }
         approved[origin] = currentToken;
+        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(ConnectionsPath))!);
         File.WriteAllText(ConnectionsPath, System.Text.Json.JsonSerializer.Serialize(approved));
     }
     public const int Port = 47821;
