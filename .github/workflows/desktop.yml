@@ -1,0 +1,35 @@
+name: Desktop build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '9.0.x'
+      - name: Test the desktop core
+        shell: pwsh
+        run: dotnet run --project src/TrueAuthor.Core.Tests -c Release
+      - name: Test Windows recovery and local API boundaries
+        shell: pwsh
+        run: dotnet run --project src/TrueAuthor.Desktop -c Release -- --self-test
+      - name: Build the single-file Windows executable
+        shell: pwsh
+        run: ./build.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: TrueAuthor-Windows-unsigned
+          path: artifacts/TrueAuthor-0.7.0-win-x64.exe
+          if-no-files-found: error
+          retention-days: 30
