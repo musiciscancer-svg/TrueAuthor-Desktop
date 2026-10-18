@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TrueAuthor.Desktop</RootNamespace>
+    <AssemblyName>TrueAuthor</AssemblyName>
+    <Version>0.7.0</Version>
+    <Product>True Author</Product>
+    <Title>True Author</Title>
+    <Company>TrueAuthor</Company>
+    <Description>Local-first Windows writing companion.</Description>
+    <Copyright>Copyright 2026 The True Author authors</Copyright>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Required by source-generated LibraryImport interop stubs. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Kestrel ships with the .NET SDK; no NuGet packages are needed. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\TrueAuthor.Core\TrueAuthor.Core.csproj" />
+  </ItemGroup>
+
+</Project>
+
