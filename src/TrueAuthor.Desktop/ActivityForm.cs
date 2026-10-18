@@ -12,6 +12,7 @@ sealed class ActivityForm : Form
 
     public ActivityForm(ClipboardLedger ledger, ActivityLog log)
     {
+        Icon = Branding.AppIcon;
         this.ledger = ledger;
         this.log = log;
         Text = "True Author: what this app holds";

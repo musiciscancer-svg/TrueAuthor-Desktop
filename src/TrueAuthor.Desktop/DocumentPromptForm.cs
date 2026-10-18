@@ -9,6 +9,7 @@ sealed class DocumentPromptForm : Form
     protected override bool ShowWithoutActivation => true;
     public DocumentPromptForm(WritingProject project, Action<bool> answer)
     {
+        Icon = Branding.AppIcon;
         this.answer = answer;
         Text = "True Author · document detected"; ClientSize = new Size(370, 220);
         FormBorderStyle = FormBorderStyle.FixedSingle; ControlBox = false;

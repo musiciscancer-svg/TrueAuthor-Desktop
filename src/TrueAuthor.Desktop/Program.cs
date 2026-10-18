@@ -350,20 +350,7 @@ sealed class TrayContext : ApplicationContext
 
     void Notify(string message) => tray.ShowBalloonTip(4000, "True Author", message, ToolTipIcon.Info);
 
-    /// <summary>A drawn "T" badge: green while capturing, grey while paused, so the state is always visible.</summary>
-    static Icon MakeIcon(bool paused)
-    {
-        using var bitmap = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bitmap))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var fill = new SolidBrush(paused ? Color.FromArgb(128, 128, 128) : Color.FromArgb(47, 93, 80));
-            g.FillEllipse(fill, 1, 1, 30, 30);
-            using var font = new Font("Segoe UI", 16, FontStyle.Bold, GraphicsUnit.Pixel);
-            TextRenderer.DrawText(g, "T", font, new Rectangle(0, 0, 32, 32), Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        }
-        return Icon.FromHandle(bitmap.GetHicon());
-    }
+    static Icon MakeIcon(bool paused) => paused ? Branding.PausedIcon : Branding.AppIcon;
 
     protected override void Dispose(bool disposing)
     {

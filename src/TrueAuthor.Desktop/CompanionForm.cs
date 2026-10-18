@@ -23,6 +23,7 @@ sealed class CompanionForm : Form
     WritingProject? currentProject;
     public CompanionForm(Func<bool> capturing, Action<bool> setPaused, Action openEditor, Action openActivity, Func<WritingProject?, Task> startProject, Func<string?> reportPath, Func<List<WritingProject>> browserProjects)
     {
+        Icon = Branding.AppIcon;
         this.capturing = capturing; this.setPaused = setPaused; this.startProject = startProject; this.reportPath = reportPath; this.browserProjects = browserProjects;
         Text = "True Author"; ClientSize = new Size(364, 470); FormBorderStyle = FormBorderStyle.None;
         MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false; BackColor = Color.FromArgb(248, 250, 252);

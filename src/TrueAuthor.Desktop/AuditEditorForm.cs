@@ -159,6 +159,7 @@ sealed class AuditEditorForm : Form
 
     public AuditEditorForm(ClipboardLedger ledger, Func<bool> capturePaused)
     {
+        Icon = Branding.AppIcon;
         this.capturePaused = capturePaused;
         copyLedger = ledger;
         Text = "True Author — private document creation audit"; Width = 1250; Height = 850; MinimumSize = new Size(900, 600);
