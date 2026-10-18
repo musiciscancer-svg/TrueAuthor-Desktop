@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>TrueAuthor.Core</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- One rule file for every client: the TypeScript packages and this app read the same JSON. -->
+    <EmbeddedResource Include="known-sources.json" LogicalName="known-sources.json" />
+  </ItemGroup>
+
+</Project>
