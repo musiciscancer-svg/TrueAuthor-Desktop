@@ -6,7 +6,7 @@ This repository contains only the desktop app, its required C# core library, tes
 
 ## Download and run
 
-Download the standalone Windows executable from [Releases](../../releases). Open `TrueAuthor-0.7.0-win-x64.exe`; no extraction or separate .NET installation is required. Until a release is published, build from source using the commands below. Current development builds are unsigned and may show a Windows publisher warning.
+Download the standalone Windows executable from the [official Windows download page](https://trueauthor.io/downloads/windows). Open `TrueAuthor-0.7.0-win-x64.exe`; no extraction or separate .NET installation is required. You can also build from the public source using the commands below. Current development builds are unsigned and may show a Windows publisher warning.
 
 Open a supported document, accept **Start tracking**, then choose **Open in browser** in the companion to inspect its local audit. The notification-area menu can pause capture or exit. An account is optional. The separately distributed Chrome extension can connect after you approve the connection once in Windows; it is not required or included here.
 
