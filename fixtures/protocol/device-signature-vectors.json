@@ -1,0 +1,29 @@
+{
+  "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEN7IKMtCdAU5AmdrR0F5LPQYUu5BLMP7+mzIihVto7P5+JXH7RPCchWXq/10Hg0vM+jRR7mWetj5dwyKBRBmsXQ==",
+  "vectors": [
+    {
+      "method": "GET",
+      "path": "/api/v2/device",
+      "body": "",
+      "timestamp": "1790000000000",
+      "canonical": "TA-DEVICE-V1\nGET\n/api/v2/device\n1790000000000\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "signature": "OOqLONNwyucBoyIvEIQn2gYXPxt5a4LS7Hu3bjupTkeefr9nmLUM13Y_F_v517XJYlL-w2I361uhTzCg0F0Z5w"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/ingest",
+      "body": "{\"schemaVersion\":2,\"note\":\"Café – “quotes” 🙂\"}",
+      "timestamp": "1790000000001",
+      "canonical": "TA-DEVICE-V1\nPOST\n/api/v2/ingest\n1790000000001\nf0211e6f3841c956708cde026cd620a86ed380ef894685f161874b0db677bec6",
+      "signature": "yXs166cxTJO4AzgmeRv5JYiWyAAwclnWD99UcIkBQEtYl24JMx3Ux8wdQH2am3Ykafa3RRG-ErH93ebMPYLzyw"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/ingest?retry=1",
+      "body": "{\"a\":1}\n",
+      "timestamp": "1790000000002",
+      "canonical": "TA-DEVICE-V1\nPOST\n/api/v2/ingest?retry=1\n1790000000002\ne346432021b04179518d9614f3560ccd71354a4ee101ddcb893d6959a9d6301c",
+      "signature": "hdJH58F6mZCvAMCIxvdtE-wxqBFS8DbU8tA2mu5hq5M-lfQcVrjVoI43KiyfMxXNHarBjXyMTeBhEV0FCIjBgQ"
+    }
+  ]
+}
