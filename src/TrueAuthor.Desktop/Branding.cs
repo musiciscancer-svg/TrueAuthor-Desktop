@@ -2,6 +2,14 @@ namespace TrueAuthor.Desktop;
 
 static class Branding
 {
+    public static readonly string IconData = LoadData();
+    static string LoadData()
+    {
+        using var stream = typeof(Branding).Assembly.GetManifestResourceStream("TrueAuthor.Desktop.Assets.TrueAuthor.ico")!;
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return "data:image/x-icon;base64," + Convert.ToBase64String(buffer.ToArray());
+    }
     public static readonly Icon AppIcon = Load("TrueAuthor.ico");
     public static readonly Icon PausedIcon = Load("TrueAuthor-paused.ico");
 

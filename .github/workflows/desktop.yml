@@ -30,6 +30,6 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: TrueAuthor-Windows-unsigned
-          path: artifacts/TrueAuthor-0.7.0-win-x64.exe
+          path: artifacts/TrueAuthor-0.7.1-win-x64.exe
           if-no-files-found: error
           retention-days: 30

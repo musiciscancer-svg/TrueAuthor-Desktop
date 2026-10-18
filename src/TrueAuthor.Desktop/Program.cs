@@ -8,6 +8,12 @@ static class Program
     [STAThread]
     static int Main(string[] args)
     {
+        if (args.Contains("--preview-library"))
+        {
+            Directory.CreateDirectory("outputs");
+            File.WriteAllText("outputs/desktop-library-preview.html", LocalDashboard.Render("/local/preview", "", Path.Combine("tmp", "empty-library-preview")));
+            return 0;
+        }
         if (args.Contains("--self-test")) return AuditStorageTest.Run();
         if (args.Contains("--discover")) { try { Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(WritingProjects.Discover(), SourceInfo.Json)); return 0; } catch (Exception error) { Console.Error.WriteLine(error); return 1; } }
         if (args.Contains("--preview-prompt"))
