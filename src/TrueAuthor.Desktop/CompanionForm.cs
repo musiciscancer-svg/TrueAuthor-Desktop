@@ -26,7 +26,7 @@ sealed class CompanionForm : Form
         Icon = Branding.AppIcon;
         this.capturing = capturing; this.setPaused = setPaused; this.startProject = startProject; this.reportPath = reportPath; this.browserProjects = browserProjects;
         Text = "True Author"; ClientSize = new Size(364, 470); FormBorderStyle = FormBorderStyle.None;
-        MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = false; BackColor = Color.FromArgb(248, 250, 252);
+        MaximizeBox = false; MinimizeBox = false; ShowInTaskbar = true; BackColor = Color.FromArgb(248, 250, 252);
         Font = new Font("Segoe UI", 10); StartPosition = FormStartPosition.Manual;
         var stack = new Panel { Dock = DockStyle.Fill, Padding = new Padding(24) };
         var title = new Label { Text = "true author.", Font = new Font("Segoe UI", 23, FontStyle.Bold), Height = 50, Dock = DockStyle.Top, ForeColor = Color.FromArgb(30, 41, 59) };
@@ -50,7 +50,8 @@ sealed class CompanionForm : Form
         FormClosing += (_, e) => { if (e.CloseReason == CloseReason.UserClosing) { e.Cancel = true; Hide(); } };
     }
     public void Reveal() { var area = Screen.PrimaryScreen!.WorkingArea; Location = new Point(area.Right - Width - 16, area.Bottom - Height - 16); Show(); Activate(); RefreshState(); }
-    public object Status() => new { deviceId = installationId, project = currentProject, report = reportPath(), server = connection.Origin.AbsoluteUri, linked = connection.Linked, linking, capturing = capturing(), message = message.Text };
+    internal Func<object>? CaptureDetails;
+    public object Status() => new { deviceId = installationId, project = currentProject, report = reportPath(), server = connection.Origin.AbsoluteUri, linked = connection.Linked, linking, capturing = capturing(), message = message.Text, capture = CaptureDetails?.Invoke() };
     public void SetNotice(string text) { message.Text = text; RefreshState(); }
     void OpenBrowser() { Process.Start(new ProcessStartInfo((linking && connection.LinkUrl is not null ? connection.LinkUrl : new Uri(LocalApi.BrowserUrl)).AbsoluteUri) { UseShellExecute = true }); Hide(); }
     async void PickProject()

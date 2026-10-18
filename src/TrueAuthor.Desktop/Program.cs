@@ -5,6 +5,7 @@ namespace TrueAuthor.Desktop;
 
 static class Program
 {
+    public static string Version => typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.8.0";
     [STAThread]
     static int Main(string[] args)
     {
@@ -48,6 +49,9 @@ sealed class TrayContext : ApplicationContext
     readonly ActivityLog log = new();
     readonly ClipboardMonitor monitor;
     readonly ProjectInputMonitor? projectInput;
+    PasteActionMonitor? pasteActions;
+    DateTimeOffset lastWritingFocus;
+    IntPtr lastWritingWindow;
     readonly System.Windows.Automation.AutomationFocusChangedEventHandler accessibleFocusHandler;
     volatile bool accessibleFocus;
     readonly ForegroundWatcher watcher;
@@ -62,6 +66,7 @@ sealed class TrayContext : ApplicationContext
     readonly System.Windows.Forms.Timer projectTimer = new() { Interval = 750 };
     WritingProject? selectedProject;
     bool observing;
+    bool pendingNativeBaseline;
     readonly Dictionary<string, WritingProject> browserProjects = [];
     readonly Dictionary<string, DateTimeOffset> browserSeen = [];
     readonly Dictionary<string, DateTimeOffset> browserSnapshots = [];
@@ -105,7 +110,7 @@ sealed class TrayContext : ApplicationContext
         documentPrompt.Show(); return false;
     }
     bool ExtensionFresh(string id) => browserSnapshots.GetValueOrDefault(id) >= DateTimeOffset.UtcNow.AddSeconds(-20);
-    AuditEditorForm ProjectEditor() { if (editor is null || editor.IsDisposed) { editor = new AuditEditorForm(ledger, () => monitor.Paused); editor.Show(); editor.Hide(); } return editor; }
+    AuditEditorForm ProjectEditor() { if (editor is null || editor.IsDisposed) { editor = new AuditEditorForm(ledger, () => monitor.Paused); editor.CaptureFault = message => { SetPaused(true); companion.SetNotice(message); companion.Reveal(); }; editor.Show(); editor.Hide(); } return editor; }
     async Task StartProject(WritingProject? project)
     {
         if (project?.Id.StartsWith("docs-window:") == true)
@@ -122,7 +127,22 @@ sealed class TrayContext : ApplicationContext
         awaitingDocument = false;
         if (project is null) { selectedProject = null; selectedDocs = null; audit.StartReferenceProject(); audit.Show(); }
         else if (project.Id.StartsWith("docs:")) { audit.ExternalGap(true); selectedProject = null; selectedDocs = project.Id[5..]; docsFirst = !audit.ResumeBrowserDocument(selectedDocs); waitingSnapshot = DateTimeOffset.UtcNow; }
-        else { var first = !audit.ResumeNativeDocument(project.Id); var text = WritingProjects.ReadWord(project.Id); observing = true; try { await audit.ObserveExternal(text, first, !monitor.Paused, project.Id.StartsWith("uia:") ? "desktop-accessible-events" : projectInput is null ? "desktop-word-snapshot" : "desktop-word-events"); audit.SetNativeDocument(project.Id); audit.SetDocumentTitle(project.Title); selectedDocs = null; selectedProject = project; wordFocusVerified = !project.Id.StartsWith("uia:") && WritingProjects.ActiveWord(project.Id); } finally { observing = false; } }
+        else
+        {
+            var first = !audit.ResumeNativeDocument(project.Id);
+            var accessible = project.Id.StartsWith("uia:");
+            var focused = !accessible || AccessibleWriting.Focused(project.Id);
+            pendingNativeBaseline = first && !focused;
+            observing = true;
+            try
+            {
+                if (focused || first) await audit.ObserveExternal(focused ? WritingProjects.ReadWord(project.Id) : "", first, !monitor.Paused, accessible ? "desktop-accessible-events" : projectInput is null ? "desktop-word-snapshot" : "desktop-word-events");
+                audit.SetNativeDocument(project.Id); audit.SetDocumentTitle(project.Title);
+                selectedDocs = null; selectedProject = project; accessibleFocus = accessible && focused;
+                wordFocusVerified = !accessible && WritingProjects.ActiveWord(project.Id);
+            }
+            finally { observing = false; }
+        }
     }
     async Task ObserveProject()
     {
@@ -146,10 +166,11 @@ sealed class TrayContext : ApplicationContext
                 ProjectEditor().ResumeDesktopCoverage();
                 if (sample.EditorFocused)
                 {
+                    lastWritingFocus = DateTimeOffset.UtcNow; lastWritingWindow = sample.Window;
                     var readable = await Task.Run(() => DesktopBrowser.ReadWindow(sample.Window));
                     if (readable?.Id == sample.Id && readable.Text is not null) await ProjectEditor().ObserveExternal(readable.Text, false, true);
                 }
-                else companion.SetNotice("Desktop-only capture: full Docs text is not exposed here. The optional extension adds precise document mapping.");
+                else companion.SetNotice("Click inside the document to resume desktop input capture. Exact text mapping depends on editor accessibility.");
                 return;
             }
         }
@@ -177,7 +198,7 @@ sealed class TrayContext : ApplicationContext
         }
         if (selectedProject is null) return;
         observing = true;
-        try { wordFocusVerified = !selectedProject.Id.StartsWith("uia:") && WritingProjects.ActiveWord(selectedProject.Id); if (!selectedProject.Id.StartsWith("uia:") && !wordFocusVerified) ProjectEditor().ObserveUncertainInput(); await ProjectEditor().ObserveExternal(WritingProjects.ReadWord(selectedProject.Id), false, !monitor.Paused); if (externalUnavailable) { externalUnavailable = false; companion.SetNotice("Document monitoring resumed."); } }
+        try { if (selectedProject.Id.StartsWith("uia:")) { accessibleFocus = await Task.Run(() => AccessibleWriting.Focused(selectedProject.Id)); if (!accessibleFocus) return; lastWritingFocus = DateTimeOffset.UtcNow; lastWritingWindow = Native.GetForegroundWindow(); } wordFocusVerified = !selectedProject.Id.StartsWith("uia:") && WritingProjects.ActiveWord(selectedProject.Id); if (wordFocusVerified && Native.ProcessName(Native.ProcessIdOf(Native.GetForegroundWindow())) == "winword.exe" && AccessibleWriting.SafeForegroundInput(Native.GetForegroundWindow())) { lastWritingFocus = DateTimeOffset.UtcNow; lastWritingWindow = Native.GetForegroundWindow(); } if (!selectedProject.Id.StartsWith("uia:") && !wordFocusVerified) ProjectEditor().ObserveUncertainInput(); await ProjectEditor().ObserveExternal(WritingProjects.ReadWord(selectedProject.Id), false, !monitor.Paused, baseline: pendingNativeBaseline); pendingNativeBaseline = false; if (externalUnavailable) { externalUnavailable = false; companion.SetNotice("Document monitoring resumed."); } }
         catch (Exception error) { if (!externalUnavailable) { externalUnavailable = true; ProjectEditor().ExternalGap(); log.Add("project", error.Message); companion.SetNotice(error.Message); } }
         finally { observing = false; }
     }
@@ -196,14 +217,31 @@ sealed class TrayContext : ApplicationContext
                 else if (selectedProject.Id.StartsWith("uia:") && accessibleFocus && source.App?.Equals(selectedProject.App, StringComparison.OrdinalIgnoreCase) == true && selectedProject.Id.StartsWith("uia:" + Native.GetForegroundWindow().ToInt64() + ":")) editor.RememberInternalCopy(text);
             }
         };
-        accessibleFocusHandler = (_, _) =>
+        accessibleFocusHandler = (focusSender, focusArgs) =>
         {
-            accessibleFocus = false;
-            var chosen = selectedProject;
-            if (chosen?.Id.StartsWith("uia:") == true) _ = Task.Run(() => { var focused = AccessibleWriting.Focused(chosen.Id); if (selectedProject?.Id == chosen.Id) accessibleFocus = focused; });
+            accessibleFocus = false; desktopBrowserInput = false;
+            var chosen = selectedProject; var docs = selectedDocs; var at = DateTimeOffset.UtcNow;
+            _ = Task.Run(() =>
+            {
+                bool focused = false;
+                try
+                {
+                    focused = chosen?.Id.StartsWith("uia:") == true ? AccessibleWriting.Focused(chosen.Id)
+                        : docs is not null ? DesktopBrowser.ReadForeground() is { EditorFocused: true } sample && sample.Id == docs
+                        : chosen is not null && WritingProjects.ActiveWord(chosen.Id) && AccessibleWriting.SafeForegroundInput(Native.GetForegroundWindow());
+                    if (selectedProject?.Id != chosen?.Id || selectedDocs != docs) return;
+                    if (chosen?.Id.StartsWith("uia:") == true) accessibleFocus = focused;
+                    if (!focused && focusSender is System.Windows.Automation.AutomationElement changed && (changed.Current.IsPassword || changed.Current.ControlType == System.Windows.Automation.ControlType.Edit || changed.Current.ControlType == System.Windows.Automation.ControlType.Document)) lastWritingFocus = default;
+                    if (!focused && companion is { IsDisposed: false }) companion.BeginInvoke((Action)(() =>
+                    {
+                        if (selectedProject?.Id == chosen?.Id && selectedDocs == docs && editor is { IsDisposed: false }) editor.ObserveFocusLoss(at);
+                    }));
+                }
+                catch (Exception error) when (error is System.Windows.Automation.ElementNotAvailableException or InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+            });
         };
-        System.Windows.Automation.Automation.AddAutomationFocusChangedEventHandler(accessibleFocusHandler);
         companion = new CompanionForm(() => !monitor.Paused, SetPaused, ShowEditor, ShowActivity, StartProject, () => editor is { IsDisposed: false, HasCheckpoint: true } && !docsFirst ? "/audits/" + editor.DocumentId : null, () => browserProjects.Where(p => browserSeen[p.Key] >= DateTimeOffset.UtcNow.AddSeconds(-20)).Select(p => p.Value).ToList());
+        companion.CaptureDetails = () => new { keyboardHook = projectInput is not null, pasteMenuObserver = pasteActions?.Available == true, focusedWritingField = accessibleFocus || desktopBrowserInput, mode = "approved-writing-fields" };
         if (Directory.Exists(AuditLocalStore.DirectoryPath)) foreach (var path in Directory.GetFiles(AuditLocalStore.DirectoryPath, "*.taudit"))
         {
             try
@@ -226,26 +264,71 @@ sealed class TrayContext : ApplicationContext
                 var process = Native.ProcessName(Native.ProcessIdOf(window));
                 var surface = SourceClassifier.DetectWritingSurface(process, Native.WindowTitle(window));
                 return wordFocusVerified && string.Equals(process, "winword.exe", StringComparison.OrdinalIgnoreCase) && string.Equals(surface?.DocumentTitle, selectedProject.Title, StringComparison.OrdinalIgnoreCase);
-            }, (kind, units) => { var projectId = selectedProject?.Id; var browserId = selectedDocs; companion.BeginInvoke((Action)(() =>
+            }, (kind, units, typedText, clipboardSequence) => { var projectId = selectedProject?.Id; var browserId = selectedDocs; companion.BeginInvoke((Action)(() =>
             {
+                if (!AccessibleWriting.SafeForegroundInput(Native.GetForegroundWindow())) return;
+                if (projectId?.StartsWith("uia:") == true && !AccessibleWriting.Focused(projectId)) return;
                 if (!monitor.Paused && browserId is not null && selectedDocs == browserId && desktopBrowser?.Id == browserId && !ExtensionFresh(browserId))
                 {
                     string? copied = null; SourceInfo? source = null;
-                    if (kind == "paste") try { copied = Clipboard.GetText(); if (copied.Length > 1_000_000) copied = null; else source = ledger.Find(SourceClassifier.HashText(copied))?.Source; } catch (System.Runtime.InteropServices.ExternalException) { }
-                    ProjectEditor().RecordDesktopObservation(kind, units, copied, source); return;
+                    if (kind == "paste") try { if (clipboardSequence == Native.GetClipboardSequenceNumber()) copied = ClipboardMonitor.ReadPaste(); if (copied is not null) source = ledger.Find(SourceClassifier.HashText(copied))?.Source; } catch (System.Runtime.InteropServices.ExternalException) { }
+                    var browserAudit = ProjectEditor();
+                    browserAudit.RecordDesktopObservation(kind, units, kind == "typing" ? typedText : copied, source);
+                    if (kind == "typing" && typedText is not null) browserAudit.ObserveTyping(typedText);
+                    else if (kind == "paste" && copied is not null) browserAudit.ObservePaste(copied, source);
+                    else browserAudit.ObserveUncertainInput();
+                    return;
                 }
                 if (monitor.Paused || selectedProject is null || selectedProject.Id != projectId) return;
                 var audit = ProjectEditor();
-                if (kind == "typing") audit.ObserveTyping(units);
+                if (kind == "typing" && typedText is not null) { audit.RecordDesktopObservation(kind, units, typedText); audit.ObserveTyping(typedText); }
                 else if (kind == "paste")
                 {
-                    try { var text = Clipboard.GetText(); audit.ObservePaste(text, ledger.Find(SourceClassifier.HashText(text))?.Source); }
+                    try {
+                        var text = clipboardSequence == Native.GetClipboardSequenceNumber() ? ClipboardMonitor.ReadPaste() : null;
+                        if (text is null) { audit.ObserveUncertainInput(); return; }
+                        var source = ledger.Find(SourceClassifier.HashText(text))?.Source;
+                        audit.RecordDesktopObservation("paste", text.Length, text, source);
+                        audit.ObservePaste(text, source);
+                    }
                     catch (System.Runtime.InteropServices.ExternalException) { audit.ObserveUncertainInput(); }
                 }
-                else audit.ObserveUncertainInput();
+                else { audit.RecordDesktopObservation(kind, units); audit.ObserveUncertainInput(); }
             })); });
         }
         catch (Exception error) { log.Add("capture", error.Message); }
+        companion.Shown += (_, _) => companion.BeginInvoke((Action)(() =>
+        {
+        try
+        {
+            pasteActions = new PasteActionMonitor((pid, clipboardSequence) =>
+            {
+                var project = selectedProject?.Id; var docs = selectedDocs;
+                companion.BeginInvoke((Action)(() =>
+                {
+                    if (monitor.Paused || (project is null && docs is null) || selectedProject?.Id != project || selectedDocs != docs || DateTimeOffset.UtcNow - lastWritingFocus > TimeSpan.FromSeconds(60)) return;
+                    var foreground = Native.GetForegroundWindow();
+                    if (foreground != lastWritingWindow || Native.ProcessIdOf(foreground) != pid) return;
+                    if (project?.StartsWith("uia:") == true && !AccessibleWriting.Valid(project)) return;
+                    if (project?.StartsWith("uia:") == true && !project.StartsWith("uia:" + foreground.ToInt64() + ":", StringComparison.Ordinal)) return;
+                    if (docs is not null && desktopBrowser?.Window != foreground) return;
+                    if (clipboardSequence != Native.GetClipboardSequenceNumber()) return;
+                    try
+                    {
+                        var text = ClipboardMonitor.ReadPaste(); if (text is null) return;
+                        var source = ledger.Find(SourceClassifier.HashText(text))?.Source;
+                        var audit = ProjectEditor(); audit.RecordDesktopObservation("paste-menu", text.Length, text, source);
+                        string? currentText = null;
+                        try { currentText = project is not null ? WritingProjects.ReadWord(project) : DesktopBrowser.ReadWindow(foreground)?.Text; }
+                        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+                        audit.ObservePaste(text, source, currentText?.Replace("\r\n", "\n").Replace('\r', '\n'));
+                    }
+                    catch (System.Runtime.InteropServices.ExternalException) { }
+                }));
+            }, accessibleFocusHandler);
+        }
+        catch (Exception error) { log.Add("capture", "Accessible paste-menu observation unavailable: " + error.Message); }
+        }));
         projectTimer.Tick += async (_, _) => await ObserveProject(); projectTimer.Start();
         api = new LocalApi(ledger, log, () => !monitor.Paused, () => token, command =>
         {
@@ -259,6 +342,10 @@ sealed class TrayContext : ApplicationContext
             {
                 try
                 {
+                    if (report.App == "Browser editor" && (WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyWindow("chrome.exe", report.Title)) || report.Active && AccessibleWriting.CurrentIsAutomaticSource()))
+                    {
+                        completion.SetResult(new { selected = false, capturing = !monitor.Paused, sourceContext = true }); return;
+                    }
                     browserSeen[report.Id] = DateTimeOffset.UtcNow;
                     if ((report.PasteText is null && report.Title != "Google Docs") || !browserProjects.ContainsKey(report.Id)) browserProjects[report.Id] = new("docs:" + report.Id, report.Title, report.App, "Input audit · typing, observed pastes and revisions");
                     if (LocalApi.ShouldFollow(report, selectedDocs, awaitingDocument, monitor.Paused, editor?.SyncBusy == true) && ConsiderProject(browserProjects[report.Id])) { var chosen = browserProjects[report.Id]; await StartProject(chosen); companion.SetProject(chosen); }
@@ -338,6 +425,7 @@ sealed class TrayContext : ApplicationContext
 
     void SetPaused(bool paused)
     {
+        if (!paused && editor?.CaptureFailed == true) { companion.SetNotice("Capture remains paused because the input history could not be saved. Start a new project after resolving the storage problem."); return; }
         monitor.Paused = paused;
         companion.RefreshState();
         if (editor is { IsDisposed: false }) editor.CaptureStateChanged();
@@ -366,12 +454,13 @@ sealed class TrayContext : ApplicationContext
             documentPrompt?.Dispose();
             tray.Visible = false;
             tray.Dispose();
+            if (editor is { IsDisposed: false }) { editor.FlushCapture(); editor.Dispose(); }
             companion.Dispose();
             projectTimer.Stop(); projectTimer.Dispose();
             watcher.Dispose();
             monitor.Dispose();
             projectInput?.Dispose();
-            System.Windows.Automation.Automation.RemoveAutomationFocusChangedEventHandler(accessibleFocusHandler);
+            pasteActions?.Dispose();
             api.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
         base.Dispose(disposing);

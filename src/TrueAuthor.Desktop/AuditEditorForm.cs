@@ -53,7 +53,9 @@ sealed class AuditEditorForm : Form
     AuditConnection? connection;
     string adapter = "desktop-reference-editor";
     readonly InputReconciler externalInput = new();
+    (AuditSnapshot Before, string Next, DateTimeOffset At, int Revision)? recentChange;
     uint lastPasteSequence;
+    DateTimeOffset lastPasteAt;
     string internalCopy = "";
     IReadOnlyList<AuditSpan>? internalLineage;
     uint internalSequence;
@@ -73,11 +75,15 @@ sealed class AuditEditorForm : Form
         catch (System.Runtime.InteropServices.ExternalException) { return; }
         internalCopy = normalized; internalLineage = audit.CopyLineage(internalCopy, start); internalSequence = Native.GetClipboardSequenceNumber();
     }
+    public void ObserveTyping(string text) => externalInput.Typed(text);
     public void ObserveTyping(int units) => externalInput.Typed(units);
+    public void ObserveFocusLoss(DateTimeOffset at) { if (externalInput.LastInputAt <= at) externalInput.Uncertain(); }
     public void ObserveUncertainInput() => externalInput.Uncertain();
-    public void ObservePaste(string text, SourceInfo? source)
+    public void ObservePaste(string text, SourceInfo? source, string? currentSnapshot = null)
     {
-        lastPasteSequence = Native.GetClipboardSequenceNumber();
+        var sequenceNow = Native.GetClipboardSequenceNumber();
+        if (lastPasteSequence == sequenceNow && DateTimeOffset.UtcNow - lastPasteAt < TimeSpan.FromMilliseconds(80)) return;
+        lastPasteSequence = sequenceNow; lastPasteAt = DateTimeOffset.UtcNow;
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
         var local = InternalPaste(text);
         if (local is not null)
@@ -89,6 +95,13 @@ sealed class AuditEditorForm : Form
         var host = safe?.Domain?.ToLowerInvariant() ?? "";
         if (!System.Text.RegularExpressions.Regex.IsMatch(host, @"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$") || host.Length > 253) host = "";
         externalInput.Paste(text, new("paste", safe?.Category ?? "unknown", safe?.Detection ?? "none", safe?.Name ?? "unknown", host, Guid.NewGuid().ToString(), safe?.Url ?? ""), DateTimeOffset.UtcNow);
+        // Windows accessibility may report an invoked Paste action just after the text snapshot.
+        // Revisit only the latest unchanged edit and only within a short event-delivery window.
+        if (currentSnapshot == audit.Text && recentChange is { } recent && recent.Revision == revision && recent.Next == audit.Text && DateTimeOffset.UtcNow - recent.At < TimeSpan.FromSeconds(2))
+        {
+            var attribution = externalInput.Reconcile(recent.Before.Text, recent.Next, DateTimeOffset.UtcNow);
+            if (audit.AttributeRecentChange(recent.Before, attribution)) { recentChange = null; revision++; Save(); RefreshStatus(); }
+        }
     }
     public Guid DocumentId => documentId;
     public bool HasCheckpoint => sequence > 0;
@@ -103,14 +116,36 @@ sealed class AuditEditorForm : Form
     }
     public void BrowserPrecision(string adapterName = "desktop-google-docs-events") { captureMode = "desktop+extension"; adapter = adapterName; Save(); }
     public void ResumeDesktopCoverage() { captureMode = "desktop-only"; if (paused) { paused = false; audit.Gap(); Save(); } }
+    readonly List<InputObservation> journalPending = [];
+    internal Action<string>? CaptureFault;
+    bool journalFailed;
+    public bool CaptureFailed => journalFailed;
+    public void FlushCapture()
+    {
+        observationSave.Stop();
+        try { InputJournal.Append(documentId, journalPending); journalPending.Clear(); Save(); }
+        catch (Exception error) when (error is IOException or System.Security.Cryptography.CryptographicException or UnauthorizedAccessException)
+        {
+            if (!journalFailed) { journalFailed = true; try { CaptureFault?.Invoke("Capture paused: " + error.Message); } catch (Exception fault) when (fault is IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException) { } }
+        }
+    }
+    readonly System.Windows.Forms.Timer observationSave = new() { Interval = 400 };
     public void RecordDesktopObservation(string kind, int units, string? text = null, SourceInfo? source = null)
     {
-        observations = observations with { TypedKeys = observations.TypedKeys + (kind == "typing" ? units : 0), PasteAttempts = observations.PasteAttempts + (kind == "paste" ? 1 : 0), UncertainEvents = observations.UncertainEvents + (kind == "uncertain" ? 1 : 0) };
-        if (kind != "typing") { observations.Recent.Add(new(DateTimeOffset.UtcNow, kind, text?.Length ?? units, text, SourceInfo.Sanitize(source))); while (observations.Recent.Count > 200 || observations.Recent.Sum(o => o.Text?.Length ?? 0) > 2_000_000) observations.Recent.RemoveAt(0); }
-        Save();
+        if (journalFailed) return;
+        if (journalPending.Count >= 2000) FlushCapture();
+        if (journalFailed) return;
+        journalPending.Add(new(DateTimeOffset.UtcNow, kind, text?.Length ?? units, text, SourceInfo.Sanitize(source)));
+        observations = observations with { TypedKeys = observations.TypedKeys + (kind == "typing" ? units : 0), PasteAttempts = observations.PasteAttempts + ((kind == "paste" || kind == "paste-menu") ? 1 : 0), UncertainEvents = observations.UncertainEvents + ((kind is "uncertain" or "backspace" or "delete" or "cut" or "undo" or "redo") ? 1 : 0) };
+        if (kind == "typing" && text is not null && observations.Recent.LastOrDefault() is { Kind: "typing", Text: not null } last && DateTimeOffset.UtcNow - last.At < TimeSpan.FromSeconds(2) && last.Text.Length + text.Length <= 4096)
+            observations.Recent[^1] = last with { At = DateTimeOffset.UtcNow, Units = last.Units + units, Text = last.Text + text };
+        else observations.Recent.Add(new(DateTimeOffset.UtcNow, kind, text?.Length ?? units, text, SourceInfo.Sanitize(source)));
+        while (observations.Recent.Count > 200 || observations.Recent.Sum(o => o.Text?.Length ?? 0) > 2_000_000) observations.Recent.RemoveAt(0);
+        if (!observationSave.Enabled) observationSave.Start();
     }
     public bool ResumeBrowserDocument(string id)
     {
+        FlushCapture();
         var saved = AuditLocalStore.FindExternal("docs:" + id);
         if (saved is null) return false;
         Restore(saved); Connect(); return true;
@@ -118,6 +153,7 @@ sealed class AuditEditorForm : Form
     public void SetBrowserDocument(string id) { externalId = "docs:" + id; Save(); }
     public bool ResumeNativeDocument(string id)
     {
+        FlushCapture();
         var saved = AuditLocalStore.FindExternal("native:" + id); if (saved is null) return false;
         Restore(saved); Connect(); return true;
     }
@@ -125,7 +161,7 @@ sealed class AuditEditorForm : Form
     public void ExternalGap(bool pause = false) { audit.Gap(); if (pause) paused = true; externalInput.Clear(); revision++; Save(); RefreshStatus(); }
     public object OutgoingMetadata() => Metadata();
     public string ServerAddress => endpoint.Text;
-    public async Task ObserveExternal(string text, bool first, bool capturing, string adapterName = "desktop-word-snapshot")
+    public async Task ObserveExternal(string text, bool first, bool capturing, string adapterName = "desktop-word-snapshot", bool baseline = false)
     {
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
         if (text.Length > 1_000_000) throw new InvalidOperationException("Document exceeds the capture limit.");
@@ -134,6 +170,7 @@ sealed class AuditEditorForm : Form
         if (paused) { paused = false; audit.Gap(); revision++; }
         if (audit.Text != text)
         {
+            var before = audit.Snapshot(); before = before with { Passages = before.Passages?.ToArray() };
             externalInput.RefreshSources((copied, origin) =>
             {
                 if (lastPasteSequence != Native.GetClipboardSequenceNumber()) return origin;
@@ -145,13 +182,13 @@ sealed class AuditEditorForm : Form
                 if (!System.Text.RegularExpressions.Regex.IsMatch(host, @"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$") || host.Length > 253) host = "";
                 return origin with { Category = source.Category, Detection = source.Detection, Source = source.Name, Host = host, LocalUrl = source.Url ?? "" };
             });
-            var origin = new AuditOrigin(first ? "preexisting" : "unobserved", "unknown", first ? "file" : "none");
-            if (!first) audit.UpdateFromInput(text, externalInput.Reconcile(audit.Text, text, DateTimeOffset.UtcNow));
+            var origin = new AuditOrigin((first || baseline) ? "preexisting" : "unobserved", "unknown", (first || baseline) ? "file" : "none");
+            if (!first && !baseline) audit.UpdateFromInput(text, externalInput.Reconcile(audit.Text, text, DateTimeOffset.UtcNow));
             else { externalInput.Clear(); audit.Update(text, origin); }
             restoring = true; try { editor.Text = text; } finally { restoring = false; }
-            revision++; Save(); RefreshStatus();
+            revision++; recentChange = first || baseline ? null : (before, text, DateTimeOffset.UtcNow, revision); Save(); RefreshStatus();
         }
-        else if (externalInput.HasPending) { externalInput.Clear(); audit.Gap(); revision++; Save(); }
+        else if (externalInput.HasPending && DateTimeOffset.UtcNow - externalInput.LastInputAt > TimeSpan.FromSeconds(2)) { externalInput.Clear(); audit.Gap(); revision++; Save(); }
         if (first) _ = Sync();
         await Task.CompletedTask;
     }
@@ -162,6 +199,8 @@ sealed class AuditEditorForm : Form
         Icon = Branding.AppIcon;
         this.capturePaused = capturePaused;
         copyLedger = ledger;
+        observationSave.Tick += (_, _) => FlushCapture();
+        FormClosed += (_, _) => { FlushCapture(); observationSave.Dispose(); };
         Text = "True Author — private document creation audit"; Width = 1250; Height = 850; MinimumSize = new Size(900, 600);
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 110, Padding = new Padding(10) };
         bar.Controls.Add(new Label { Text = "Audit server", AutoSize = true }); bar.Controls.Add(endpoint);
@@ -267,7 +306,7 @@ sealed class AuditEditorForm : Form
     void ResetDocument(bool saveOld)
     {
         if (busy) throw new InvalidOperationException("Wait for device linking/sync to finish.");
-        if (saveOld) Save(); documentTitle = "Untitled writing project"; externalId = null; captureMode = "desktop-only"; observations = new(0, 0, 0, []); externalInput.Clear(); documentId = Guid.NewGuid(); started = DateTimeOffset.UtcNow; audit = new(); sequence = 0; previous = new('0', 64); pending = []; paused = false; revision = 0; lastQueuedRevision = -1;
+        if (saveOld) FlushCapture(); journalFailed = false; recentChange = null; documentTitle = "Untitled writing project"; externalId = null; captureMode = "desktop-only"; observations = new(0, 0, 0, []); externalInput.Clear(); documentId = Guid.NewGuid(); started = DateTimeOffset.UtcNow; audit = new(); sequence = 0; previous = new('0', 64); pending = []; paused = false; revision = 0; lastQueuedRevision = -1;
         restoring = true; try { editor.Clear(); } finally { restoring = false; } Save(); RefreshStatus();
     }
     void DeleteLocal()
@@ -309,7 +348,7 @@ sealed class AuditEditorForm : Form
     }
     static string SafeSource(string source) => new[] { "ChatGPT", "Claude", "Gemini", "Microsoft Copilot", "Perplexity", "Microsoft Word", "Google Docs", "Notepad", "LibreOffice Writer", "Microsoft PowerPoint", "Microsoft Excel", "OneNote", "Notion", "Obsidian", "Adobe Acrobat", "Adobe Acrobat Reader", "SumatraPDF", "Foxit PDF Reader", "Zotero", "Mendeley", "Visual Studio Code", "Outlook", "Microsoft Teams", "Slack", "Discord", "Tracked document" }.FirstOrDefault(name => source == name || source == name + " desktop") ?? (source == "unknown" ? "unknown" : "other");
     static string Digest(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
-    object Metadata() => new { version = 4, activity = audit.Activity, documentId, sequence = sequence + pending.Count + 1, previous = pending.Count > 0 ? Digest(pending[^1]) : previous, recordedAt = DateTimeOffset.UtcNow.ToString("O"), startedAt = started.ToString("O"), contentHash = Digest(audit.Text), total = audit.Text.Length, inserted = audit.Inserted, deleted = audit.Deleted, gaps = audit.Gaps, recordingState = paused || capturePaused() ? "paused" : "recording", client = new { version = "0.5.0", adapter }, spans = audit.Spans().Select(s => new { s.Start, s.Length, kind = s.Origin.Kind, category = s.Origin.Category, detection = s.Origin.Detection, source = s.Origin.Kind == "paste" ? SafeSource(s.Origin.Source) : "unknown", host = s.Origin.Kind == "paste" ? s.Origin.Host : "", passageId = s.Origin.Kind == "paste" ? s.Origin.PassageId : "" }), passages = audit.Passages.Select(p => new { id = p.Id, characters = p.Characters, recordedAt = p.RecordedAt.ToString("O"), category = p.Origin.Category, detection = p.Origin.Detection, source = SafeSource(p.Origin.Source), host = p.Origin.Host }) };
+    object Metadata() => new { version = 4, activity = audit.Activity, documentId, sequence = sequence + pending.Count + 1, previous = pending.Count > 0 ? Digest(pending[^1]) : previous, recordedAt = DateTimeOffset.UtcNow.ToString("O"), startedAt = started.ToString("O"), contentHash = Digest(audit.Text), total = audit.Text.Length, inserted = audit.Inserted, deleted = audit.Deleted, gaps = audit.Gaps, recordingState = paused || capturePaused() ? "paused" : "recording", client = new { version = Program.Version, adapter }, spans = audit.Spans().Select(s => new { s.Start, s.Length, kind = s.Origin.Kind, category = s.Origin.Category, detection = s.Origin.Detection, source = s.Origin.Kind == "paste" ? SafeSource(s.Origin.Source) : "unknown", host = s.Origin.Kind == "paste" ? s.Origin.Host : "", passageId = s.Origin.Kind == "paste" ? s.Origin.PassageId : "" }), passages = audit.Passages.Select(p => new { id = p.Id, characters = p.Characters, recordedAt = p.RecordedAt.ToString("O"), category = p.Origin.Category, detection = p.Origin.Detection, source = SafeSource(p.Origin.Source), host = p.Origin.Host }) };
     void Preview()
     {
         var preview = new Form { Text = "Outgoing metadata — no manuscript or clipboard text", Width = 850, Height = 650 };

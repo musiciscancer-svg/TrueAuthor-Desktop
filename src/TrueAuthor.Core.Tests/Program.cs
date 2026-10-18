@@ -151,6 +151,34 @@ Check("cut and paste keeps original AI source", moveAudit.Spans().Single().Origi
 Check("internal paste history and activity remain consistent", moveAudit.Activity.PasteInserted == moveAudit.Passages.Sum(p => p.Characters) && moveAudit.Activity.PasteEvents == moveAudit.Passages.Count);
 var ambiguousCopy = new DocumentAudit(); ambiguousCopy.Update("same same", typedOrigin);
 Check("ambiguous internal copies are not guessed", ambiguousCopy.CopyLineage("same") is null && ambiguousCopy.CopyLineage("same", 0) is not null);
+reconciler.Typed("abc"); Check("translated typing requires matching characters not equal length", reconciler.Resolve("", "xyz", inputNow).Kind == "unobserved");
+reconciler.Typed("a\n\tZ"); Check("translated Enter and Tab reconcile exactly", reconciler.Resolve("", "a\n\tZ", inputNow).Kind == "typed");
+reconciler.Typed("é😀"); Check("Unicode typing uses UTF16 units and exact text", reconciler.Resolve("", "é😀", inputNow).Kind == "typed");
+reconciler.Typed("draft "); reconciler.Paste("AI TEXT", aiOrigin, inputNow); var exactMixed = reconciler.Reconcile("", "draft AI TEXT", inputNow);
+Check("exact typed prefix and paste preserve separate origins", exactMixed.Count == 2 && exactMixed[0].Origin.Kind == "typed" && exactMixed[1].Origin == aiOrigin);
+reconciler.Typed("wrong "); reconciler.Paste("AI TEXT", aiOrigin, inputNow); var mismatchMixed = reconciler.Reconcile("", "draft AI TEXT", inputNow);
+Check("paste can match while unrelated equal length typing remains unknown", mismatchMixed.Count == 2 && mismatchMixed[0].Origin.Kind == "unobserved" && mismatchMixed[1].Origin == aiOrigin);
+reconciler.Typed("secret"); reconciler.Clear(); Check("clearing focus discards translated text", reconciler.Resolve("", "secret", inputNow).Kind == "unobserved");
+reconciler.Typed("abc"); reconciler.Uncertain(); Check("navigation cannot misattribute captured characters", reconciler.Resolve("", "abc", inputNow).Kind == "unobserved");
+
+reconciler.Typed("late"); Check("stale translated input cannot explain a future change", reconciler.Resolve("", "late", DateTimeOffset.UtcNow.AddSeconds(21)).Kind == "unobserved");
+reconciler.Uncertain(); reconciler.Paste("AI TEXT", aiOrigin, inputNow); Check("fresh paste action after menu navigation can match exact text", reconciler.Resolve("", "AI TEXT", inputNow) == aiOrigin);
+reconciler.Paste("AI TEXT", aiOrigin, inputNow); reconciler.Uncertain(); Check("focus loss invalidates earlier paste intent", reconciler.Resolve("", "AI TEXT", inputNow).Kind == "unobserved");
+var delayedAudit = new DocumentAudit(); delayedAudit.Update("draft ", new("preexisting", "unknown", "file"));
+var beforeDelayed = delayedAudit.Snapshot() with { Passages = delayedAudit.Passages.ToArray() };
+delayedAudit.Update("draft AI TEXT", new("unobserved", "unknown", "none"));
+var insertedBeforeCorrection = delayedAudit.Inserted; var editsBeforeCorrection = delayedAudit.Activity.EditEvents;
+reconciler.Paste("AI TEXT", aiOrigin, inputNow);
+Check("delayed paste notification can explain the latest exact change", delayedAudit.AttributeRecentChange(beforeDelayed, reconciler.Reconcile(beforeDelayed.Text, delayedAudit.Text, inputNow)));
+Check("delayed attribution preserves edit and insertion counters", delayedAudit.Inserted == insertedBeforeCorrection && delayedAudit.Activity.EditEvents == editsBeforeCorrection && delayedAudit.Activity.PasteInserted == 7 && delayedAudit.Passages.Count == 1);
+Check("delayed paste cannot overwrite already attributed text", !delayedAudit.AttributeRecentChange(beforeDelayed, [new(6,7,aiOrigin)]));
+var intervening = DocumentAudit.Restore(beforeDelayed); intervening.Update("draft AI TEXT", new("unobserved", "unknown", "none")); intervening.Update("draft AI TEXT!", new("unobserved", "unknown", "none"));
+Check("delayed evidence cannot roll back intervening edits", !intervening.AttributeRecentChange(beforeDelayed, [new(6,7,aiOrigin),new(13,1,new("unobserved","unknown","none"))]));
+Check("ChatGPT is an automatic source, not a document prompt", WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyUrl("https://chatgpt.com/c/sample")));
+Check("Claude is an automatic source, not a document prompt", WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyUrl("https://claude.ai/chat/sample")));
+Check("research pages are automatic sources", WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyUrl("https://arxiv.org/abs/example")));
+Check("Google Docs remains a writing destination", !WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyUrl("https://docs.google.com/document/d/example/edit")));
+Check("Word remains a writing destination", !WritingRolePolicy.IsAutomaticSource(SourceClassifier.ClassifyWindow("winword.exe", "Test - Word")));
 Console.WriteLine($"{passed} passed, {failed} failed");
 return failed == 0 ? 0 : 1;
 

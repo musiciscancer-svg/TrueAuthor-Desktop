@@ -104,7 +104,7 @@ sealed partial class LocalApi(ClipboardLedger ledger, ActivityLog log, Func<bool
                 context.Response.Headers.CacheControl = "no-store";
                 context.Response.Headers["Referrer-Policy"] = "no-referrer";
                 var scriptHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(LocalDashboard.LiveScript)));
-                context.Response.Headers["Content-Security-Policy"] = $"default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-{scriptHash}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+                context.Response.Headers["Content-Security-Policy"] = $"default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'sha256-{scriptHash}'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
                 await next(); return;
             }
@@ -134,7 +134,7 @@ sealed partial class LocalApi(ClipboardLedger ledger, ActivityLog log, Func<bool
             await next();
         });
 
-        app.MapGet("/v1/status", () => Results.Json(new { app = "True Author Desktop", version = "0.7.0", capturing = capturing(), selectedDocument = browserDocument?.Invoke(), ledgerSize = ledger.Count }, SourceInfo.Json));
+        app.MapGet("/v1/status", () => Results.Json(new { app = "True Author Desktop", version = Program.Version, capturing = capturing(), selectedDocument = browserDocument?.Invoke(), ledgerSize = ledger.Count }, SourceInfo.Json));
         app.MapPost("/v1/connect", async (HttpContext context) =>
         {
             if (!await connectionGate.WaitAsync(0)) return Results.StatusCode(429);
@@ -153,7 +153,17 @@ sealed partial class LocalApi(ClipboardLedger ledger, ActivityLog log, Func<bool
             catch (TimeoutException) { return Results.StatusCode(408); }
             finally { connectionGate.Release(); }
         });
-        app.MapGet(browserPath, (HttpContext context) => Results.Content(LocalDashboard.Render(browserPath, context.Request.Query["document"].ToString()), "text/html; charset=utf-8"));
+        app.MapGet(browserPath, (HttpContext context) =>
+        {
+            var document = context.Request.Query["document"].ToString();
+            if (context.Request.Query["export"] == "inputs")
+            {
+                if (!Guid.TryParse(document, out var id) || !File.Exists(AuditLocalStore.PathFor(id))) return Results.NotFound();
+                try { return Results.File(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(InputJournal.Read(id), SourceInfo.Json), "application/json", "TrueAuthor-input-history-" + id + ".json"); }
+                catch (Exception error) when (error is IOException or System.Security.Cryptography.CryptographicException or UnauthorizedAccessException) { return Results.Problem("The encrypted input history could not be read. Its file has been kept."); }
+            }
+            return Results.Content(LocalDashboard.Render(browserPath, document), "text/html; charset=utf-8");
+        });
         app.MapPost("/v1/projects/docs", async (DocsReport report) =>
         {
             if (!Regex.IsMatch(report.Id ?? "", "^[A-Za-z0-9_-]{1,200}$") || report.Title is null || report.Title.Length > 512 || report.Text?.Length > 1_000_000 || report.PasteText?.Length > 1_000_000 || report.CopyText?.Length > 1_000_000 || report.Typed is < 0 or > 1_000_000 || report.App is not ("Google Docs" or "Browser editor")) return Results.BadRequest();

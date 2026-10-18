@@ -12,3 +12,4 @@ outputs/
 *.key
 *.taudit
 .env*
+*.tinputs

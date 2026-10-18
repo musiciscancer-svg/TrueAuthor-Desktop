@@ -37,7 +37,7 @@ static class LocalDashboard
    foreach(var e in entries) html.Append($"<section><small>{E(e.updated.ToString("MMM d, yyyy · HH:mm"))}</small><h2><a href='{E(basePath)}?document={e.saved.DocumentId}'>{E(Title(e.saved))}</a></h2><p>{e.audit.Text.Length:N0} text units · {e.audit.Passages.Count} paste segments · {e.audit.Gaps} gaps</p><pre>{E(e.audit.Text.Length==0?"No document text captured yet.":e.audit.Text[..Math.Min(180,e.audit.Text.Length)])}</pre><a class='button-link' href='{E(basePath)}?document={e.saved.DocumentId}'>Open document <span aria-hidden='true'>↗</span></a></section>");
    html.Append("</div>");
   }
-  else Detail(html,current[0].saved,current[0].audit,current[0].updated);
+  else { Detail(html,current[0].saved,current[0].audit,current[0].updated); html.Append($"<a class='button-link' href='{E(basePath)}?document={current[0].saved.DocumentId}&amp;export=inputs' download>Export full input history ↓</a><p>The exported file contains private recorded text. Keep it somewhere private.</p>"); }
   if(unreadable>0) html.Append($"<p>{unreadable} audits could not be opened. Their files have been kept.</p>");
   html.Append($"<details class='device-details'><summary>Device information</summary><code>{E(DeviceIdentity.InstallationId())}</code><p>No account needed. This ID is an identifier, not an access password.</p></details><footer><span class='privacy-title'>Private by design.</span><p>Your document text and source details stay on this PC. Optional cloud sync sends audit metadata only.</p><details><summary>About this writing history</summary><p>This view shows current saved text and paste history. This adapter does not record full revision snapshots.</p></details></footer></div></div></main></html>");
   html.Append("<script>" + LiveScript + "</script>"); return html.ToString();
@@ -47,10 +47,10 @@ static class LocalDashboard
   h.Append($"<section><h2>Capture coverage</h2><p>Latest capture mode: <b>{E(saved.CaptureMode)}</b>. Desktop-only browser text depends on Windows accessibility. Extension-assisted snapshots add document-level mapping; neither mode proves authorship.</p>");
   if (saved.Observations is { } o)
   {
-   h.Append($"<p>{o.TypedKeys:N0} typing-key observations · {o.PasteAttempts:N0} paste shortcut observations · {o.UncertainEvents:N0} uncertain input events</p><p>These are desktop observations, not confirmed document insertions. They are not included in the highlighted passage totals or attributed to document positions. This recent observation log remains local.</p>");
+   h.Append($"<p>{o.TypedKeys:N0} typing-key observations · {o.PasteAttempts:N0} paste action observations · {o.UncertainEvents:N0} uncertain input events</p><p>These are desktop observations, not confirmed document insertions. Text highlights use separately matched document changes. This is the recent-events view. The full recorded input journal is encrypted on this PC and can be exported below; it is not uploaded.</p>");
    foreach(var input in o.Recent)
    {
-    h.Append($"<details><summary>{E(input.At.ToLocalTime().ToString("g"))} · {E(input.Kind)} · {input.Units:N0} clipboard units</summary><p>{E(input.Source?.Name ?? "Unknown source")} · {E(input.Source?.Url)} · {E(input.Source?.Detection ?? "none")}</p>");
+    h.Append($"<details><summary>{E(input.At.ToLocalTime().ToString("g"))} · {E(input.Kind)} · {input.Units:N0} text units</summary><p>{E(input.Source?.Name ?? "Unknown source")} · {E(input.Source?.Url)} · {E(input.Source?.Detection ?? "none")}</p>");
     if(input.Text is not null) h.Append($"<pre>{E(input.Text)}</pre>");
     h.Append("</details>");
    }

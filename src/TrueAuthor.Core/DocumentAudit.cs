@@ -64,6 +64,18 @@ public sealed class DocumentAudit
             if (span.Origin.Kind != "unobserved") Activity = Activity with { UnobservedInserted = Activity.UnobservedInserted - span.Length, TypedInserted = Activity.TypedInserted + (span.Origin.Kind == "typed" ? span.Length : 0), PasteInserted = Activity.PasteInserted + (span.Origin.Kind == "paste" ? span.Length : 0), PreexistingInserted = Activity.PreexistingInserted + (span.Origin.Kind == "preexisting" ? span.Length : 0), PasteEvents = Activity.PasteEvents + (span.Origin.Kind == "paste" ? 1 : 0) };
         }
     }
+    /// <summary>Reconcile a delayed input notification only against the single unchanged recent edit, without inventing new edit counters.</summary>
+    public bool AttributeRecentChange(AuditSnapshot before, IReadOnlyList<AuditSpan> attribution)
+    {
+        if (attribution.Count == 0 || !attribution.Any(s => s.Origin.Kind == "paste") || before.Text == Text) return false;
+        var start = attribution[0].Start; var length = attribution.Sum(s => s.Length);
+        if (start < 0 || start + length > origins.Count || origins.Skip(start).Take(length).Any(o => o.Kind != "unobserved")) return false;
+        var replay = Restore(before); replay.UpdateFromInput(Text, attribution);
+        if (replay.Inserted != Inserted || replay.Deleted != Deleted || replay.Gaps != Gaps || replay.Activity.EditEvents != Activity.EditEvents) return false;
+        origins.Clear(); origins.AddRange(replay.origins);
+        passages.Clear(); passages.AddRange(replay.passages); Activity = replay.Activity;
+        return true;
+    }
     public static DocumentAudit Restore(AuditSnapshot snapshot)
     {
         if (snapshot.Text.Length > 1_000_000 || snapshot.Inserted < 0 || snapshot.Deleted < 0 || snapshot.Gaps < 0 || snapshot.Inserted - snapshot.Deleted != snapshot.Text.Length) throw new InvalidDataException("Invalid saved audit counters.");

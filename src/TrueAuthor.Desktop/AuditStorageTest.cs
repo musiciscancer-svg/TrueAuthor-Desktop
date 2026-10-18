@@ -7,10 +7,13 @@ static class AuditStorageTest
 {
     public static int Run()
     {
-        var directory = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "tmp", "audit-storage-test-" + Guid.NewGuid()));
+        var directory = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "trueauthor-audit-storage-test-" + Guid.NewGuid()));
         var id = Guid.NewGuid(); var path = Path.Combine(directory, id + ".taudit");
         try
         {
+            foreach (var name in new[] { "Password", "Verification code", "Address and search bar", "Credit card number", "Search" })
+                if (!AccessibleWriting.ExcludedName(name)) throw new InvalidOperationException("Sensitive input field was not excluded: " + name);
+            if (AccessibleWriting.ExcludedName("Research essay") || AccessibleWriting.ExcludedName("Document editor")) throw new InvalidOperationException("Writing field was incorrectly excluded.");
             var doc = new DocumentAudit(); doc.Update("PRIVATE SAMPLE", new("typed", "none", "keyboard"));
             var promptPolicy = new DocumentPromptPolicy(); var promptTime = DateTimeOffset.UtcNow;
             if (promptPolicy.Offer("docs:a", true, false, promptTime) || promptPolicy.Offer("docs:a", false, true, promptTime)) throw new InvalidOperationException("A paused or busy app offered tracking.");
@@ -60,13 +63,22 @@ static class AuditStorageTest
             Directory.CreateDirectory("outputs");
             File.WriteAllText("outputs/document-library-fictional-preview.html", detail.Replace("Source mapping fixture &lt;test&gt;", "Fictional source mapping preview"));
             File.Delete(Path.Combine(directory, second.DocumentId + ".taudit"));
+            InputJournal.Append(id, [new(DateTimeOffset.UtcNow, "typing", 14, "PRIVATE TYPING"),new(DateTimeOffset.UtcNow, "paste", 12, "PRIVATE PASTE", SourceInfo.Unknown)], directory);
+            if (Encoding.UTF8.GetString(File.ReadAllBytes(InputJournal.PathFor(id, directory))).Contains("PRIVATE")) throw new InvalidOperationException("Input journal exposed plaintext.");
+            var history = InputJournal.Read(id, directory);
+            if (history.Count != 2 || history[0].Text != "PRIVATE TYPING" || history[1].Kind != "paste") throw new InvalidOperationException("Encrypted input history did not round trip.");
+            InputJournal.Append(id, [new(DateTimeOffset.UtcNow, "undo", 0)], directory);
+            if (InputJournal.Read(id, directory).Count != 3) throw new InvalidOperationException("Input history append lost an earlier batch.");
+            using (var truncated = new FileStream(InputJournal.PathFor(id, directory), FileMode.Open, FileAccess.Write)) truncated.SetLength(truncated.Length - 2);
+            try { _ = InputJournal.Read(id, directory); throw new Exception("Truncated journal was accepted."); } catch (InvalidDataException) { }
+            Console.WriteLine("Input journal: Windows encryption, ordered batches, full history and truncated-file rejection passed.");
             Console.WriteLine("Document library: multiple documents, full preview, source navigation, removed pastes and escaped titles passed.");
             TestBrowserBoundary().GetAwaiter().GetResult();
             Console.WriteLine("Desktop storage: Windows encryption, document recovery, retry recovery and atomic save passed.");
             return 0;
         }
         catch (Exception error) { Console.Error.WriteLine(error.Message); return 1; }
-        finally { if (File.Exists(path)) File.Delete(path); if (Directory.Exists(directory)) Directory.Delete(directory); }
+        finally { if (File.Exists(path)) File.Delete(path); var journalPath = InputJournal.PathFor(id, directory); if (File.Exists(journalPath)) File.Delete(journalPath); if (Directory.Exists(directory)) Directory.Delete(directory); }
     }
     static async Task TestBrowserBoundary()
     {

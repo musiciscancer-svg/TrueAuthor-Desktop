@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>TrueAuthor.Desktop</RootNamespace>
     <AssemblyName>TrueAuthor</AssemblyName>
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
     <ApplicationIcon>Assets\TrueAuthor.ico</ApplicationIcon>
     <Product>True Author</Product>
     <Title>True Author</Title>

@@ -57,6 +57,18 @@ sealed class ClipboardMonitor : NativeWindow, IDisposable
         return false;
     }
 
+    public static string? ReadPaste()
+    {
+        var data = Retry(Clipboard.GetDataObject);
+        if (data is null || OptedOut(data) || !data.GetDataPresent(DataFormats.UnicodeText)) return null;
+        var owner = Native.GetClipboardOwner();
+        var pid = Native.ProcessIdOf(owner);
+        var html = data.GetDataPresent(DataFormats.Html) ? data.GetData(DataFormats.Html) as string : null;
+        if (SourceClassifier.ResolveCopySource(Native.ProcessName(pid), Native.MainWindowTitle(pid), html) is Classification.Blocked) return null;
+        var text = data.GetData(DataFormats.UnicodeText) as string;
+        return text is { Length: > 0 and <= 1_000_000 } ? text : null;
+    }
+
     void Capture()
     {
         var owner = Native.GetClipboardOwner();
