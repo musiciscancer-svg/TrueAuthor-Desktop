@@ -1,0 +1,52 @@
+[
+  {
+    "input": "Hello world",
+    "normalized": "Hello world",
+    "sha256": "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+  },
+  {
+    "input": "  Hello world\r\n",
+    "normalized": "Hello world",
+    "sha256": "64ec88ca00b268e5ba1a35678a1b5316d212f4f366b2477232534a8aeca37f3c"
+  },
+  {
+    "input": "Line one\r\nLine two\rLine three",
+    "normalized": "Line one\nLine two\nLine three",
+    "sha256": "46c949c0b79bc3c1eef1d2970222427b7a0e8d70233d4cc2429535f0f41a0e9a"
+  },
+  {
+    "input": "﻿Docs export text",
+    "normalized": "Docs export text",
+    "sha256": "b57d33808d240885f3fe19dbcef1183e2b3ec49dd88f5bb26db01a9886f59bd9"
+  },
+  {
+    "input": "non breaking space",
+    "normalized": "non breaking space",
+    "sha256": "08fa5727b4113776e12277768bcffd0c46c0073eb576d4f4b6a7f1db781b4a20"
+  },
+  {
+    "input": "zero​width",
+    "normalized": "zerowidth",
+    "sha256": "7bf3c6bb9998a666f0be68878045efa93bcba718c8d340de26da0c2736d7a47c"
+  },
+  {
+    "input": "Café – “quotes” — 日本語 🙂",
+    "normalized": "Café – “quotes” — 日本語 🙂",
+    "sha256": "53985af9d32214ec0142bebc96182b851e5542a1685a3bab5d7a516a1533184e"
+  },
+  {
+    "input": "\t\n\n",
+    "normalized": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "input": "",
+    "normalized": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "input": "Keep  internal   spacing\n\nand paragraphs",
+    "normalized": "Keep  internal   spacing\n\nand paragraphs",
+    "sha256": "97ac4c6575053d7e93f5a65b023ef01454662dd414e287c2264bcbf1613db2e3"
+  }
+]
